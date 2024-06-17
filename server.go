@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"net"
 	"os"
@@ -61,7 +63,15 @@ func handleConn(conn net.Conn) {
             acceptedEncoding := strings.TrimPrefix(headers[acceptEncodingIndex], "Accept-Encoding: ")
             fmt.Println(acceptedEncoding)
             if strings.Contains(acceptedEncoding, "gzip") {
-                res = fmt.Sprintf("%s\r\nContent-Encoding: gzip\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(params), params)
+                var b bytes.Buffer
+                enc := gzip.NewWriter(&b)
+                _, err := enc.Write([]byte(params))
+                if err != nil {
+                    fmt.Println("error of encoding data:", err.Error())
+                }
+                enc.Close()
+
+                res = fmt.Sprintf("%s\r\nContent-Encoding: gzip\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(b.String()), b.String())
             } else {
                 res = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(params), params)
             }
