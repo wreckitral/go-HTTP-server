@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -42,10 +43,9 @@ func handleConn(conn net.Conn) {
 
 	req := strings.Split(string(buf), "\r\n")
     fmt.Println(req)
-
 	method := strings.Split(req[0], " ")[0]
-
 	path := strings.Split(req[0], " ")[1]
+    headers := req[1:]
 
 	var res string
 
@@ -53,7 +53,20 @@ func handleConn(conn net.Conn) {
 	case path == "/":
          res = getStatus(200, "OK") + "\r\n\r\n"
 	case strings.HasPrefix(path, "/echo/"):
-        res = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(path[6:]), path[6:])
+        params := path[6:]
+        acceptEncodingIndex := slices.IndexFunc(headers, func(h string) bool { return strings.Contains(h, "Accept-Encoding: ") })
+        if acceptEncodingIndex == -1 {
+            res = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(params), params)
+        } else {
+            acceptedEncoding := strings.TrimPrefix(headers[acceptEncodingIndex], "Accept-Encoding: ")
+            fmt.Println(acceptedEncoding)
+            if strings.Contains(acceptedEncoding, "gzip") {
+                res = fmt.Sprintf("%s\r\nContent-Encoding: gzip\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(params), params)
+            } else {
+                res = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(params), params)
+            }
+
+        }
 	case path == "/user-agent":
         userAgent := strings.Split(req[2], " ")[1]
 		res = fmt.Sprintf("%s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", getStatus(200, "OK"), len(userAgent), userAgent)
